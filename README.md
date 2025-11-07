@@ -1,6 +1,6 @@
 # NutriScan AI PoC — Quick Start
 
-This is a simple Capacitor app that captures a photo, uploads it to S3 using temporary credentials, and sends the image to Gemini for analysis. Your teammate will email you the required credentials. You do not need to create AWS resources.
+This is a simple Capacitor app that captures a photo, uploads it to S3 using temporary credentials, and sends the image to Gemini for analysis. 
 
 ---
 
@@ -61,13 +61,10 @@ Open `www/index.html`, find the config constants near the top of the `<script>` 
 ```js
 // AWS
 const AWS_REGION = "us-east-1";                    // use the region I shared if different
-const COGNITO_IDENTITY_POOL_ID = "us-east-1:...";  // short format Region:UUID (do not paste an ARN)
-const S3_BUCKET = "nutriscan-ai-storage";          // use the bucket name I shared if different
-const S3_PREFIX = "nutriscan/";                    // leave as is unless told otherwise
+const COGNITO_IDENTITY_POOL_ID = "us-east-1:...";                  
 
 // Gemini
 const GEMINI_API_KEY = "paste_the_key_from_email"; // for this class PoC only
-const MODEL = "gemini-2.5-flash-preview-09-2025";  // you can keep this
 ```
 
 You do not need to create Cognito or S3. The values I sent are already active. You only need to paste them.
@@ -121,9 +118,6 @@ If your friend cannot install directly, they may need to allow installs from unk
 ## Troubleshooting
 
 * **Camera button does nothing on emulator**: some emulators have no camera feed. Use the file picker fallback or switch to a physical device.
-* **ValidationException identityPoolId**: make sure the value looks like `us-east-1:12345678-1234-1234-1234-1234567890ab` (short format). Do not paste an ARN.
-* **AccessControlListNotSupported**: the bucket uses bucket owner enforced object ownership. The app already avoids ACLs, so just use the code as is.
-* **403 AccessDenied** when uploading: confirm that `AWS_REGION`, `COGNITO_IDENTITY_POOL_ID`, `S3_BUCKET`, and `S3_PREFIX` exactly match what I sent.
 * **CORS error**: wait a minute and try again. The bucket is already configured for PUT and GET.
 
 ---
@@ -146,5 +140,4 @@ You do not need any other npm libraries for this PoC.
 
 ## Notes on security for the class demo
 
-* Keep the emailed values private. Do not post them online. Do not commit them to a public repo.
-* For a production system, move the Gemini call to a backend service and store the key in Secrets Manager. That is out of scope for this class demo.
+* Kindly Keep the emailed values private.
