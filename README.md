@@ -101,7 +101,7 @@ In Android Studio:
 * Menu: Build → Build Bundle or APKs → Build APKs
 * The file will appear under `app/build/outputs/apk/`
 
-If your friend cannot install directly, they may need to allow installs from unknown sources on the phone. They should not need SHAREit or any third party installer.
+If you cannot install directly, they may need to allow installs from unknown sources on the phone. They should not need any third party installer.
 
 ---
 
