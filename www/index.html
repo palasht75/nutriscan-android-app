@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>NutriScan AI - Food Log PoC</title>
+
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+
+  <!-- Icons -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+
+  <!-- Capacitor bridge -->
+  <script src="capacitor.js"></script>
+
+  <!-- AWS SDK v2 -->
+  <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1481.0.min.js"></script>
+
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .spinner { border-top-color: #3498db; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body class="bg-slate-50 flex items-center justify-center min-h-screen">
+  <div class="w-full max-w-md mx-auto bg-white rounded-2xl shadow-2xl overflow-hidden my-4">
+    <header class="p-4 bg-gradient-to-r from-sky-500 to-indigo-600 text-white flex items-center justify-between">
+      <div class="flex items-center space-x-2">
+        <i data-lucide="camera" class="w-6 h-6"></i>
+        <h1 class="text-xl font-bold">NutriScan AI</h1>
+      </div>
+      <span class="text-xs font-semibold uppercase">Live AI</span>
+    </header>
+
+    <main class="p-6">
+      <!-- 1. Initial Screen -->
+      <div id="initial-screen">
+        <div class="text-center">
+          <div class="flex justify-center mb-4">
+            <div class="w-20 h-20 bg-sky-100 rounded-full flex items-center justify-center">
+              <i data-lucide="image" class="w-12 h-12 text-sky-600"></i>
+            </div>
+          </div>
+          <h2 class="text-2xl font-bold text-slate-800 mb-2">Log Your Meal Instantly</h2>
+          <p class="text-slate-500 mb-6">Use your camera for an AI powered nutritional analysis.</p>
+          <button id="scan-button" class="w-full bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-transform transform hover:scale-105 flex items-center justify-center space-x-2">
+            <i data-lucide="camera"></i>
+            <span>Scan Your Meal</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 2. Image Preview Screen -->
+      <div id="image-preview-screen" class="hidden">
+        <div class="text-center">
+          <h2 class="text-2xl font-bold text-slate-800 mb-2">Ready to Analyze?</h2>
+          <p id="s3-status" class="text-sm text-slate-500 mb-3 hidden"></p>
+          <img id="image-preview" alt="Food preview" class="rounded-xl mb-6 w-full h-auto object-cover shadow-md border-4 border-slate-100"/>
+          <button id="analyze-button" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-transform transform hover:scale-105 flex items-center justify-center space-x-2">
+            <i data-lucide="sparkles"></i>
+            <span>Analyze Meal with AI</span>
+          </button>
+          <button id="rescan-button" class="w-full mt-3 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-3 px-4 rounded-xl transition-colors">
+            <i data-lucide="arrow-left" class="inline-block mr-2 w-4 h-4"></i>
+            <span>Choose Another Photo</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 3. Loading Screen -->
+      <div id="loading-screen" class="hidden">
+        <div class="text-center py-12">
+          <div class="spinner w-16 h-16 border-4 border-slate-200 rounded-full mx-auto mb-6"></div>
+          <h2 class="text-2xl font-bold text-slate-800 mb-2">AI is Analyzing...</h2>
+          <p id="loading-status" class="text-slate-500">Communicating with Gemini...</p>
+        </div>
+      </div>
+
+      <!-- 4. Results Screen -->
+      <div id="results-screen" class="hidden">
+        <div>
+          <h2 class="text-2xl font-bold text-slate-800 mb-4">AI Analysis Complete</h2>
+          <img id="result-image" alt="Analyzed food" class="rounded-xl mb-6 w-full h-auto object-cover shadow-md border-4 border-slate-100"/>
+
+          <div id="error-message" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg mb-6">
+            <p class="font-bold">Analysis Failed</p>
+            <p>The AI could not process this image. Please try a clearer photo.</p>
+          </div>
+
+          <div class="bg-green-100 border-l-4 border-green-500 text-green-800 p-4 rounded-lg mb-6">
+            <p class="text-sm">Total Estimated Calories</p>
+            <p id="total-calories" class="text-4xl font-bold">0 kcal</p>
+          </div>
+
+          <h3 class="font-bold text-slate-700 mb-3">Detected Ingredients:</h3>
+          <ul id="ingredient-list" class="space-y-3 mb-6"></ul>
+
+          <h3 class="font-bold text-slate-700 mb-3">Estimated Macronutrients:</h3>
+          <div class="grid grid-cols-3 gap-4 text-center">
+            <div class="bg-red-100 p-3 rounded-lg">
+              <p class="text-sm font-medium text-red-800">Protein</p>
+              <p id="macro-protein" class="text-xl font-bold text-red-900">0g</p>
+            </div>
+            <div class="bg-blue-100 p-3 rounded-lg">
+              <p class="text-sm font-medium text-blue-800">Carbs</p>
+              <p id="macro-carbs" class="text-xl font-bold text-blue-900">0g</p>
+            </div>
+            <div class="bg-yellow-100 p-3 rounded-lg">
+              <p class="text-sm font-medium text-yellow-800">Fat</p>
+              <p id="macro-fat" class="text-xl font-bold text-yellow-900">0g</p>
+            </div>
+          </div>
+
+          <button id="scan-again-button" class="w-full mt-8 bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-transform transform hover:scale-105 flex items-center justify-center space-x-2">
+            <i data-lucide="rotate-cw"></i>
+            <span>Scan Another Meal</span>
+          </button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      /* Fill these */
+      const AWS_REGION = "us-east-1";                         // example "us-east-1"
+      const COGNITO_IDENTITY_POOL_ID = "us-east-1:f7ba8c65-21f4-422a-ab5d-5ef3432c8a28";           // example "us-east-1:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+      const S3_BUCKET = "nutriscan-ai-storage";
+      const S3_PREFIX = "nutriscan/";                           // must match your policy prefix
+
+      const GEMINI_API_KEY = "AIzaSyA43uyG9CbTIGdsdGccu0uosJS6_ShRVhw";                                 // demo key
+      const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`;
+
+      /* AWS init */
+      AWS.config.region = AWS_REGION;
+      AWS.config.credentials = new AWS.CognitoIdentityCredentials(
+        { IdentityPoolId: COGNITO_IDENTITY_POOL_ID },
+        { region: AWS_REGION }
+      );
+      if (AWS.config.credentials && AWS.config.credentials.clearCachedId) {
+        AWS.config.credentials.clearCachedId();
+      }
+      const ensureAwsCreds = async () => new Promise((res, rej) => {
+        AWS.config.credentials.get(err => err ? rej(err) : res());
+      });
+      await ensureAwsCreds();
+
+      const s3 = new AWS.S3({ apiVersion: "2006-03-01" });
+
+      /* Elements */
+      const scanButton = document.getElementById('scan-button');
+      const rescanButton = document.getElementById('rescan-button');
+      const analyzeButton = document.getElementById('analyze-button');
+      const scanAgainButton = document.getElementById('scan-again-button');
+
+      const initialScreen = document.getElementById('initial-screen');
+      const imagePreviewScreen = document.getElementById('image-preview-screen');
+      const loadingScreen = document.getElementById('loading-screen');
+      const resultsScreen = document.getElementById('results-screen');
+      const allScreens = [initialScreen, imagePreviewScreen, loadingScreen, resultsScreen];
+
+      const imagePreview = document.getElementById('image-preview');
+      const resultImage = document.getElementById('result-image');
+      const errorMessageEl = document.getElementById('error-message');
+      const s3StatusEl = document.getElementById('s3-status');
+
+      const totalCaloriesEl = document.getElementById('total-calories');
+      const ingredientListEl = document.getElementById('ingredient-list');
+      const macroProteinEl = document.getElementById('macro-protein');
+      const macroCarbsEl = document.getElementById('macro-carbs');
+      const macroFatEl = document.getElementById('macro-fat');
+
+      let currentImageBase64 = null;
+
+      /* Helpers */
+      const showScreen = (id) => {
+        allScreens.forEach(s => s.id === id ? s.classList.remove('hidden') : s.classList.add('hidden'));
+      };
+      const isPluginAvailable = (name) => {
+        const cap = window.Capacitor;
+        return !!(cap && cap.isPluginAvailable && cap.isPluginAvailable(name) && cap.Plugins && cap.Plugins[name]);
+      };
+      const ensureCameraPermission = async (Camera) => {
+        try {
+          if (!Camera || !Camera.checkPermissions || !Camera.requestPermissions) return true;
+          const status = await Camera.checkPermissions();
+          if (status.camera === 'granted') return true;
+          const req = await Camera.requestPermissions({ permissions: ['camera'] });
+          return req.camera === 'granted';
+        } catch { return true; }
+      };
+      const base64ToBlob = (b64, mime = 'image/jpeg') => {
+        const byteChars = atob(b64);
+        const buf = new Uint8Array(byteChars.length);
+        for (let i = 0; i < byteChars.length; i++) buf[i] = byteChars.charCodeAt(i);
+        return new Blob([buf], { type: mime });
+      };
+      const showS3Status = (msg, isError = false) => {
+        s3StatusEl.textContent = msg;
+        s3StatusEl.classList.remove('hidden');
+        s3StatusEl.classList.toggle('text-red-600', isError);
+        s3StatusEl.classList.toggle('text-slate-500', !isError);
+      };
+
+      async function uploadToS3FromBase64(base64, filename) {
+        try {
+          //showS3Status('Uploading to S3…');
+          await ensureAwsCreds();
+          const Body = base64ToBlob(base64, 'image/jpeg');
+          const Key = `${S3_PREFIX}${filename}`;
+          const params = { Bucket: S3_BUCKET, Key, Body, ContentType: 'image/jpeg' };
+          await s3.putObject(params).promise();
+          //showS3Status('Uploaded to S3');
+          return `https://${S3_BUCKET}.s3.${AWS_REGION}.amazonaws.com/${Key}`;
+        } catch (e) {
+          //console.error('S3 upload error', e);
+          //showS3Status('S3 upload failed', true);
+          return null;
+        }
+      }
+
+      /* Capture */
+      const takePicture = async () => {
+        if (isPluginAvailable('Camera')) {
+          const Camera = window.Capacitor.Plugins.Camera;
+          const granted = await ensureCameraPermission(Camera);
+          if (!granted) { console.error('Camera permission not granted'); return; }
+          try {
+            const image = await Camera.getPhoto({
+              quality: 90,
+              allowEditing: false,
+              resultType: 'base64',
+              source: 'CAMERA'
+            });
+            currentImageBase64 = image.base64String;
+            const url = `data:image/${image.format || 'jpeg'};base64,${image.base64String}`;
+            imagePreview.src = url;
+            resultImage.src = url;
+            showScreen('image-preview-screen');
+
+            const niceName = `meal_${Date.now()}.jpg`;
+            await uploadToS3FromBase64(currentImageBase64, niceName);
+            return;
+          } catch (err) {
+            console.error('Camera getPhoto error:', err);
+          }
+        }
+
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = async (ev) => {
+          const file = ev.target.files && ev.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = async (e) => {
+            const dataUrl = e.target.result;
+            const b64 = String(dataUrl).split(',')[1] || null;
+            currentImageBase64 = b64;
+            imagePreview.src = dataUrl;
+            resultImage.src = dataUrl;
+            showScreen('image-preview-screen');
+
+            const safeName = file.name.replace(/\s+/g, '_') || `meal_${Date.now()}.jpg`;
+            await uploadToS3FromBase64(currentImageBase64, safeName);
+          };
+          reader.readAsDataURL(file);
+        };
+        input.click();
+      };
+
+      /* Gemini */
+      const getAiAnalysis = async (base64ImageData) => {
+        showScreen('loading-screen');
+        errorMessageEl.classList.add('hidden');
+
+        const payload = {
+          contents: [{
+            parts: [
+              { text: "Analyze the provided image of a meal. Identify each ingredient, estimate its weight in grams, and calculate its caloric value. Also provide the total calories and macro breakdown for the entire meal. Return only JSON." },
+              { inlineData: { mimeType: "image/jpeg", data: base64ImageData } }
+            ]
+          }],
+          generationConfig: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: "OBJECT",
+              properties: {
+                total_calories: { type: "NUMBER" },
+                macros: {
+                  type: "OBJECT",
+                  properties: {
+                    protein_g: { type: "NUMBER" },
+                    carbs_g: { type: "NUMBER" },
+                    fat_g: { type: "NUMBER" }
+                  },
+                  required: ["protein_g", "carbs_g", "fat_g"]
+                },
+                ingredients: {
+                  type: "ARRAY",
+                  items: {
+                    type: "OBJECT",
+                    properties: {
+                      name: { type: "STRING" },
+                      calories: { type: "NUMBER" },
+                      weight_g: { type: "NUMBER" }
+                    },
+                    required: ["name", "calories", "weight_g"]
+                  }
+                }
+              },
+              required: ["total_calories", "macros", "ingredients"]
+            }
+          }
+        };
+
+        try {
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          if (!res.ok) throw new Error(`Gemini error ${res.status}`);
+          const result = await res.json();
+          const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (!text) throw new Error('Invalid AI response');
+          const analysis = JSON.parse(text);
+          displayResults(analysis);
+        } catch (e) {
+          console.error('AI Analysis Error:', e);
+          displayError();
+        }
+      };
+
+      /* Results UI */
+      const displayError = () => {
+        errorMessageEl.classList.remove('hidden');
+        totalCaloriesEl.parentElement.classList.add('hidden');
+        ingredientListEl.parentElement.classList.add('hidden');
+        macroProteinEl.closest('.grid').parentElement.classList.add('hidden');
+        showScreen('results-screen');
+      };
+
+      const displayResults = (analysis) => {
+        totalCaloriesEl.parentElement.classList.remove('hidden');
+        ingredientListEl.parentElement.classList.remove('hidden');
+        macroProteinEl.closest('.grid').parentElement.classList.remove('hidden');
+
+        totalCaloriesEl.textContent = `${Math.round(analysis.total_calories || 0)} kcal`;
+        macroProteinEl.textContent = `${Math.round(analysis.macros?.protein_g || 0)}g`;
+        macroCarbsEl.textContent = `${Math.round(analysis.macros?.carbs_g || 0)}g`;
+        macroFatEl.textContent = `${Math.round(analysis.macros?.fat_g || 0)}g`;
+
+        ingredientListEl.innerHTML = '';
+        const items = Array.isArray(analysis.ingredients) ? analysis.ingredients : [];
+        if (items.length === 0) {
+          ingredientListEl.innerHTML = `<li class="text-slate-500 text-center">No ingredients detected.</li>`;
+        } else {
+          for (const item of items) {
+            const li = document.createElement('li');
+            li.className = "flex items-center justify-between bg-slate-100 p-3 rounded-lg";
+            li.innerHTML = `
+              <div>
+                <p class="font-semibold text-slate-800">${item.name || 'Item'}</p>
+                <p class="text-sm text-slate-500">${Math.round(item.weight_g || 0)}g (est.)</p>
+              </div>
+              <span class="font-bold text-slate-700 text-lg">${Math.round(item.calories || 0)} kcal</span>
+            `;
+            ingredientListEl.appendChild(li);
+          }
+        }
+        showScreen('results-screen');
+      };
+
+      /* Events */
+      document.getElementById('scan-button').addEventListener('click', takePicture);
+      document.getElementById('rescan-button').addEventListener('click', takePicture);
+      document.getElementById('analyze-button').addEventListener('click', () => { if (currentImageBase64) getAiAnalysis(currentImageBase64); });
+      document.getElementById('scan-again-button').addEventListener('click', () => {
+        currentImageBase64 = null;
+        s3StatusEl.classList.add('hidden');
+        errorMessageEl.classList.add('hidden');
+        showScreen('initial-screen');
+      });
+
+      lucide.createIcons();
+    });
+  </script>
+</body>
+</html>
