@@ -1,4 +1,4 @@
-# NutriScan AI PoC — Quick Start
+# NutriScan AI PoC
 
 This is a simple Capacitor app that captures a photo, uploads it to S3 using temporary credentials, and sends the image to Gemini for analysis. 
 
