@@ -4,8 +4,7 @@ This is a simple Capacitor app that captures a photo, uploads it to S3 using tem
 
 ---
 
-## What you get
-
+## File Structure
 * A `www/` folder with a single page app
 * Android project files created by Capacitor after you run the commands below
 
@@ -54,9 +53,9 @@ npx cap add android
 
 ---
 
-## Put in the credentials I emailed you
+## Put in the credentials
 
-Open `www/index.html`, find the config constants near the top of the `<script>` tag, and replace the placeholders with the values from the email.
+Open `www/index.html`, find the config constants near the top of the `<script>` tag, and replace the placeholders.
 
 ```js
 // AWS
@@ -67,7 +66,7 @@ const COGNITO_IDENTITY_POOL_ID = "us-east-1:...";
 const GEMINI_API_KEY = "paste_the_key_from_email"; // for this class PoC only
 ```
 
-You do not need to create Cognito or S3. The values I sent are already active. You only need to paste them.
+You do not need to create Cognito or S3. The values are already active. Only need to paste them.
 
 ---
 
@@ -101,8 +100,7 @@ In Android Studio:
 * Menu: Build → Build Bundle or APKs → Build APKs
 * The file will appear under `app/build/outputs/apk/`
 
-If you cannot install directly, they may need to allow installs from unknown sources on the phone. They should not need any third party installer.
-
+If you cannot install directly, you may need to allow installs from unknown sources on the phone.
 ---
 
 ## How to use the app
@@ -137,7 +135,3 @@ CDN scripts already included in `index.html`:
 You do not need any other npm libraries for this PoC.
 
 ---
-
-## Notes on security for the class demo
-
-* Kindly Keep the emailed values private.
